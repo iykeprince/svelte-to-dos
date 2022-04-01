@@ -1,19 +1,15 @@
 <script>
-  import FilterButton from "./FilterButton.svelte";
   import Todo from "./Todo.svelte";
-  export let todos = [];
-  let newTodoName = "";
+  import FilterButton from "./FilterButton.svelte";
+  import MoreActions from "./MoreActions.svelte";
+  import NewTodo from "./NewTodo.svelte";
+  import TodoStatus from "./TodoStatus.svelte";
+  import { alert } from "../stores";
 
-  $: totalTodos = todos.length;
-  $: completedTodos = todos.filter((todo) => todo.completed).length;
-  let newTodoId;
-  $: {
-    if (totalTodos === 0) {
-      newTodoId = 1;
-    } else {
-      newTodoId = Math.max(...todos.map((t) => t.id)) + 1;
-    }
-  }
+  export let todos = [];
+
+  $: newTodoId = todos.length ? Math.max(...todos.map((t) => t.id)) + 1 : 1;
+
   let filter = "all";
   const filterTodos = (filter, todos) =>
     filter === "active"
@@ -22,52 +18,53 @@
       ? todos.filter((t) => t.completed)
       : todos;
 
-  function removeTodo(todo) {
-    todos = todos.filter((t) => t.id !== todo.id);
+  $: {
+    if (filter === "all") $alert = "Browsing all to-dos";
+    else if (filter === "active") $alert = "Browsing active to-dos";
+    else if (filter === "completed") $alert = "Browsing completed to-dos";
   }
 
-  function addTodo() {
-    todos = [...todos, { id: newTodoId, name: newTodoName, completed: false }];
-    newTodoName = "";
+  function removeTodo(todo) {
+    todos = todos.filter((t) => t.id !== todo.id);
+    $alert = `Todo '${todo.name} has been deleted`;
+  }
+
+  function addTodo(name) {
+    todos = [...todos, { id: newTodoId, name, completed: false }];
+    $alert = `Todo '${name}' has been added`;
   }
 
   function updateTodo(todo) {
     const i = todos.findIndex((t) => t.id === todo.id);
+    if (todos[i].name !== todo.name)
+      $alert = `todo '${todos[i].name}' has been renamed to '${todo.name}'`;
+    if (todos[i].completed !== todo.completed)
+      $alert = `todo '${todos[i].name}' marked as ${
+        todo.completed ? "completed" : "active"
+      }`;
     todos[i] = { ...todos[i], ...todo };
+  }
+
+  function checkAllTodos(completed) {
+    todos = todos.map((t) => ({ ...t, completed: completed }));
+    $alert = `${completed ? "Checked" : "Unchecked"} ${todos.length} to-dos`;
+  }
+
+  function removeCompleted() {
+    $alert = `Removed ${todos.filter((t) => t.completed).length} to-dos`;
+    todos = todos.filter((t) => !t.completed);
   }
 </script>
 
 <!-- Todos.svelte -->
 <div class="todoapp stack-large">
   <!-- NewTodo -->
-  <form>
-    <h2 class="label-wrapper">
-      <label for="todo-0" class="label__lg"> What needs to be done? </label>
-    </h2>
-    <input
-      type="text"
-      id="todo-0"
-      autocomplete="off"
-      class="input input__lg"
-      bind:value={newTodoName}
-    />
-    <button
-      type="submit"
-      disabled=""
-      class="btn btn__primary btn__lg"
-      on:click|preventDefault={addTodo}
-    >
-      Add
-    </button>
-  </form>
-
+  <NewTodo autofocus on:addTodo={(e) => addTodo(e.detail)} />
   <!-- Filter -->
   <FilterButton bind:filter />
 
   <!-- TodosStatus -->
-  <h2 id="list-heading">
-    {completedTodos} out of {totalTodos} items completed
-  </h2>
+  <TodoStatus {todos} />
 
   <!-- Todos -->
   <ul role="list" class="todo-list stack-large" aria-labelledby="list-heading">
@@ -87,8 +84,9 @@
   <hr />
 
   <!-- MoreActions -->
-  <div class="btn-group">
-    <button type="button" class="btn btn__primary">Check all</button>
-    <button type="button" class="btn btn__primary">Remove completed</button>
-  </div>
+  <MoreActions
+    {todos}
+    on:checkAll={(e) => checkAllTodos(e.detail)}
+    on:removeCompleted={removeCompleted}
+  />
 </div>
